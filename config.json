@@ -1,0 +1,11 @@
+{
+  "ollama" : {
+    "url": "http://localhost:11434",
+    "model": "incept5/llama3.1-claude:latest"
+  },
+  "mcp_servers": [{
+    "name": "orion-mcp",
+    "url": "http://localhost:3030/mcp",
+    "enabled": true
+  }]
+} 

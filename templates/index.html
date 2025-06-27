@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Continious Performance Testing Inspector - Chatbot</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/lib/highlight.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/github.min.css">
+    <style>
+        .chat-container { height: 900px; overflow-y: auto; }
+        .message { margin-bottom: 1rem; padding: 0.75rem; border-radius: 0.5rem; }
+        .message.user { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; margin-left: auto; }
+        .message.bot { background: #f3f4f6; color: #374151; border: 1px solid #e5e7eb; }
+        .message.bot .message-content { line-height: 1.6; }
+        .message.bot .message-content h1, .message.bot .message-content h2, .message.bot .message-content h3 { 
+            font-weight: 600; margin-top: 1rem; margin-bottom: 0.5rem; 
+        }
+        .message.bot .message-content h1 { font-size: 1.5rem; }
+        .message.bot .message-content h2 { font-size: 1.25rem; }
+        .message.bot .message-content h3 { font-size: 1.125rem; }
+        .message.bot .message-content p { margin-bottom: 0.75rem; }
+        .message.bot .message-content ul, .message.bot .message-content ol { 
+            margin-left: 1.5rem; margin-bottom: 0.75rem; 
+        }
+        .message.bot .message-content li { margin-bottom: 0.25rem; }
+        .message.bot .message-content code { 
+            background: #f1f5f9; padding: 0.125rem 0.25rem; border-radius: 0.25rem; 
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace; font-size: 0.875rem;
+        }
+        .message.bot .message-content pre { 
+            background: #1e293b; color: #e2e8f0; padding: 1rem; border-radius: 0.5rem; 
+            overflow-x: auto; margin: 0.75rem 0; 
+        }
+        .message.bot .message-content pre code { 
+            background: none; padding: 0; color: inherit; 
+        }
+        .message.bot .message-content blockquote { 
+            border-left: 4px solid #3b82f6; padding-left: 1rem; margin: 0.75rem 0; 
+            color: #6b7280; font-style: italic; 
+        }
+        .typing { display: flex; align-items: center; gap: 4px; padding: 0.75rem; background: #f3f4f6; border-radius: 0.5rem; width: fit-content; }
+        .typing-dot { width: 8px; height: 8px; border-radius: 50%; background: #9ca3af; animation: typing 1.4s infinite ease-in-out; }
+        .typing-dot:nth-child(1) { animation-delay: -0.32s; }
+        .typing-dot:nth-child(2) { animation-delay: -0.16s; }
+        @keyframes typing { 0%, 80%, 100% { transform: scale(0.8); opacity: 0.5; } 40% { transform: scale(1); opacity: 1; } }
+        .status-indicator { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 0.5rem; }
+        .status-online { background: #10b981; }
+        .status-offline { background: #ef4444; }
+        .status-error { background: #f59e0b; }
+        .status-unknown { background: #6b7280; }
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); }
+        .modal-content { background-color: white; margin: 5% auto; padding: 20px; border-radius: 8px; width: 80%; max-width: 800px; max-height: 80vh; overflow-y: auto; }
+        .close { color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer; }
+        .close:hover { color: black; }
+        /* Settings floating box */
+        #settingsFloating {
+            position: fixed;
+            top: 2rem;
+            right: 2rem;
+            z-index: 1100;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+        }
+        #toggleSettingsBtn {
+            min-width: 44px;
+            min-height: 44px;
+            border-radius: 9999px;
+            padding: 0.5rem 0.7rem;
+            font-size: 1.5rem;
+            background: #1f2937;
+            color: white;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            border: none;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        #toggleSettingsBtn:hover {
+            background: #374151;
+        }
+        #settingsPanel {
+            margin-top: 0.5rem;
+            background: white;
+            border-radius: 0.75rem;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.12);
+            max-width: 20rem;
+            width: 100%;
+            padding: 1.25rem 1rem;
+            font-size: 0.95rem;
+        }
+        
+        /* Dark mode styles */
+        .dark {
+            background-color: #111827 !important;
+            color: #f9fafb !important;
+        }
+        .dark .bg-white { background-color: #1f2937 !important; }
+        .dark .bg-gray-50 { background-color: #111827 !important; }
+        .dark .text-gray-800 { color: #f9fafb !important; }
+        .dark .text-gray-600 { color: #d1d5db !important; }
+        .dark .text-gray-500 { color: #9ca3af !important; }
+        .dark .border-gray-200 { border-color: #374151 !important; }
+        .dark .border-gray-300 { border-color: #4b5563 !important; }
+        .dark .message.bot { 
+            background: #374151 !important; 
+            color: #f9fafb !important; 
+            border-color: #4b5563 !important; 
+        }
+        .dark .message.bot .message-content code { 
+            background: #1e293b !important; 
+            color: #e2e8f0 !important; 
+        }
+        .dark .message.bot .message-content pre { 
+            background: #0f172a !important; 
+            color: #e2e8f0 !important; 
+        }
+        .dark .message.bot .message-content blockquote { 
+            border-left-color: #60a5fa !important; 
+            color: #9ca3af !important; 
+        }
+        .dark #settingsPanel { 
+            background: #1f2937 !important; 
+            color: #f9fafb !important; 
+        }
+        .dark .bg-blue-50 { background-color: #1e3a8a !important; }
+        .dark .text-blue-800 { color: #93c5fd !important; }
+        .dark .border-blue-200 { border-color: #1e40af !important; }
+        .dark .bg-gray-50 { background-color: #374151 !important; }
+        .dark .text-gray-500 { color: #9ca3af !important; }
+        .dark .text-gray-400 { color: #6b7280 !important; }
+        .dark .bg-blue-50 { background-color: #1e3a8a !important; }
+        .dark .text-blue-600 { color: #93c5fd !important; }
+        .dark .border-blue-200 { border-color: #1e40af !important; }
+        .dark .modal-content { 
+            background-color: #1f2937 !important; 
+            color: #f9fafb !important; 
+        }
+        .dark .border-gray-200 { border-color: #374151 !important; }
+        .dark .bg-blue-50 { background-color: #1e3a8a !important; }
+        .dark .text-blue-800 { color: #93c5fd !important; }
+        .dark .text-blue-600 { color: #93c5fd !important; }
+        .dark .text-gray-500 { color: #9ca3af !important; }
+        .dark .text-red-500 { color: #f87171 !important; }
+        
+        @media (max-width: 1024px) {
+            #settingsFloating { right: 0.5rem; top: 0.5rem; }
+            #settingsPanel { max-width: 95vw; }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <div id="settingsFloating">
+        <button id="toggleSettingsBtn" title="Show Settings">
+            <i class="fas fa-cog"></i>
+        </button>
+        <div id="settingsPanel" class="hidden">
+            <h2 class="text-lg font-semibold mb-3 text-gray-800">
+                <i class="fas fa-cog mr-2"></i>Configuration
+            </h2>
+            <!-- Model Info -->
+            <div class="mb-4">
+                <h3 class="text-base font-medium text-gray-800 mb-2">Model</h3>
+                <div class="bg-blue-50 border border-blue-200 rounded-md p-2">
+                    <div class="font-medium text-blue-800 text-sm" id="modelInfo">Loading...</div>
+                </div>
+            </div>
+            <!-- MCP Servers Info -->
+            <div class="mb-4">
+                <h3 class="text-base font-medium text-gray-800 mb-2">MCP Servers</h3>
+                <div id="mcpServersInfo" class="space-y-1">
+                    <div class="text-gray-500 text-xs">Loading...</div>
+                </div>
+                <button id="viewToolsBtn" class="mt-2 w-full bg-green-600 text-white px-2 py-1 rounded-md hover:bg-green-700 transition-colors text-sm">
+                    <i class="fas fa-tools mr-1"></i>View MCP Tools
+                </button>
+            </div>
+            <!-- Dark Mode Toggle -->
+            <div class="mb-4">
+                <h3 class="text-base font-medium text-gray-800 mb-2">Appearance</h3>
+                <button id="darkModeToggle" class="w-full bg-gray-600 text-white px-2 py-1 rounded-md hover:bg-gray-700 transition-colors text-sm">
+                    <i class="fas fa-moon mr-1"></i>Toggle Dark Mode
+                </button>
+            </div>
+            <!-- Clear Chat -->
+            <div>
+                <button id="clearChatBtn" class="w-full bg-red-600 text-white px-2 py-1 rounded-md hover:bg-red-700 transition-colors text-sm">
+                    <i class="fas fa-trash mr-1"></i>Clear Chat
+                </button>
+            </div>
+        </div>
+    </div>
+    <div class="container mx-auto px-2 py-8 max-w-full">
+        <!-- Header -->
+        <header class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-gray-800 mb-2">
+                Continuous Performance Testing Inspector
+            </h1>
+            <p class="text-gray-600">Chatbot with Ollama & CPT MCP Servers</p>
+        </header>
+        <div class="flex flex-col items-center">
+            <!-- Chat Area -->
+            <div class="w-full max-w-7xl">
+                <div class="bg-white rounded-lg shadow-md h-[900px] flex flex-col w-full">
+                    <!-- Chat Header -->
+                    <div class="border-b border-gray-200 p-4">
+                        <h2 class="text-xl font-semibold text-gray-800">
+                            <i class="fas fa-comments mr-2"></i>Chat
+                        </h2>
+                    </div>
+                    <!-- Messages Container -->
+                    <div id="chatContainer" class="flex-1 overflow-y-auto p-6 space-y-4 chat-container">
+                        <div class="text-center text-gray-500 py-8">
+                            <i class="fas fa-comment-dots text-4xl mb-4"></i>
+                            <p>Start a conversation with your configured model</p>
+                        </div>
+                    </div>
+                    <!-- Input Area -->
+                    <div class="border-t border-gray-200 p-6">
+                        <form id="chatForm" class="flex space-x-2 max-w-4xl mx-auto">
+                            <input type="text" id="prompt" 
+                                   class="flex-1 p-4 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg"
+                                   placeholder="Type your message..." required>
+                            <button type="submit" 
+                                    class="bg-blue-600 text-white px-10 py-4 rounded-md hover:bg-blue-700 transition-colors text-lg">
+                                <i class="fas fa-paper-plane"></i>
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- MCP Tools Modal -->
+    <div id="toolsModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2 class="text-2xl font-bold mb-4">
+                <i class="fas fa-tools mr-2"></i>Available MCP Tools
+            </h2>
+            <div id="toolsContent" class="space-y-4">
+                <div class="text-gray-500">Loading tools...</div>
+            </div>
+        </div>
+    </div>
+    <script>
+        // Configure marked for better rendering
+        marked.setOptions({
+            highlight: function(code, lang) {
+                if (lang && hljs.getLanguage(lang)) {
+                    try {
+                        return hljs.highlight(code, { language: lang }).value;
+                    } catch (err) {}
+                }
+                return hljs.highlightAuto(code).value;
+            },
+            breaks: true,
+            gfm: true
+        });
+
+        // Settings dropdown logic
+        const toggleSettingsBtn = document.getElementById('toggleSettingsBtn');
+        const settingsPanel = document.getElementById('settingsPanel');
+        let settingsVisible = false;
+        toggleSettingsBtn.onclick = function() {
+            settingsVisible = !settingsVisible;
+            if (settingsVisible) {
+                settingsPanel.classList.remove('hidden');
+                toggleSettingsBtn.innerHTML = '<i class="fas fa-cog mr-2"></i> Hide Settings';
+            } else {
+                settingsPanel.classList.add('hidden');
+                toggleSettingsBtn.innerHTML = '<i class="fas fa-cog"></i>';
+            }
+        };
+
+        // Load configuration
+        async function loadConfig() {
+            try {
+                const resp = await fetch('/api/config');
+                const config = await resp.json();
+                
+                // Update model info
+                document.getElementById('modelInfo').textContent = config.model;
+                
+                // Update MCP servers info
+                const mcpContainer = document.getElementById('mcpServersInfo');
+                if (config.mcp_servers.length === 0) {
+                    mcpContainer.innerHTML = '<div class="text-gray-500 text-sm">No MCP servers configured</div>';
+                } else {
+                    mcpContainer.innerHTML = config.mcp_servers.map(server => {
+                        const statusClass = `status-${server.status}`;
+                        const statusText = server.status.charAt(0).toUpperCase() + server.status.slice(1);
+                        return `
+                            <div class="bg-gray-50 border border-gray-200 rounded-md p-2">
+                                <div class="flex items-center">
+                                    <span class="status-indicator ${statusClass}"></span>
+                                    <div class="flex-1">
+                                        <div class="font-medium text-sm">${server.name}</div>
+                                        <div class="text-xs text-gray-500">${server.url}</div>
+                                        <div class="text-xs text-gray-400">Status: ${statusText}</div>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+                }
+            } catch (e) {
+                console.error('Error loading config:', e);
+                document.getElementById('modelInfo').textContent = 'Error loading configuration';
+            }
+        }
+
+        // Load MCP tools
+        async function loadMCPTools() {
+            try {
+                const resp = await fetch('/api/mcp/tools');
+                const data = await resp.json();
+                
+                const toolsContent = document.getElementById('toolsContent');
+                if (Object.keys(data.tools).length === 0) {
+                    toolsContent.innerHTML = '<div class="text-gray-500">No MCP tools available</div>';
+                    return;
+                }
+                
+                let toolsHtml = '';
+                for (const [serverName, tools] of Object.entries(data.tools)) {
+                    toolsHtml += `
+                        <div class="border border-gray-200 rounded-md p-4">
+                            <h3 class="text-lg font-semibold mb-3 text-gray-800">
+                                <i class="fas fa-server mr-2"></i>${serverName}
+                            </h3>
+                    `;
+                    
+                    if (tools.length === 0) {
+                        toolsHtml += '<div class="text-gray-500 text-sm">No tools available</div>';
+                    } else {
+                        toolsHtml += '<div class="space-y-2">';
+                        tools.forEach(tool => {
+                            toolsHtml += `
+                                <div class="bg-blue-50 border border-blue-200 rounded-md p-3">
+                                    <div class="font-medium text-blue-800">${tool.name || 'Unknown Tool'}</div>
+                                    ${tool.description ? `<div class="text-sm text-blue-600 mt-1">${tool.description}</div>` : ''}
+                                    ${tool.inputSchema ? `<div class="text-xs text-gray-500 mt-1">Input schema available</div>` : ''}
+                                </div>
+                            `;
+                        });
+                        toolsHtml += '</div>';
+                    }
+                    
+                    toolsHtml += '</div>';
+                }
+                
+                toolsContent.innerHTML = toolsHtml;
+            } catch (e) {
+                console.error('Error loading MCP tools:', e);
+                document.getElementById('toolsContent').innerHTML = '<div class="text-red-500">Error loading MCP tools</div>';
+            }
+        }
+
+        // Add message to chat with proper formatting
+        function addMessage(role, text) {
+            const container = document.getElementById('chatContainer');
+            const div = document.createElement('div');
+            div.className = `message ${role}`;
+            
+            if (role === 'bot') {
+                // Format bot messages with markdown
+                const messageContent = document.createElement('div');
+                messageContent.className = 'message-content';
+                messageContent.innerHTML = marked.parse(text);
+                div.appendChild(messageContent);
+            } else {
+                // User messages remain as plain text
+                div.textContent = text;
+            }
+            
+            container.appendChild(div);
+            container.scrollTop = container.scrollHeight;
+            
+            // Highlight code blocks after adding to DOM
+            if (role === 'bot') {
+                div.querySelectorAll('pre code').forEach((block) => {
+                    hljs.highlightElement(block);
+                });
+            }
+        }
+
+        // Show typing indicator
+        function showTyping() {
+            const container = document.getElementById('chatContainer');
+            const div = document.createElement('div');
+            div.id = 'typing';
+            div.className = 'typing';
+            div.innerHTML = '<div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div>';
+            container.appendChild(div);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        // Hide typing indicator
+        function hideTyping() {
+            const typing = document.getElementById('typing');
+            if (typing) typing.remove();
+        }
+
+        // Chat form submission
+        document.getElementById('chatForm').onsubmit = async function(e) {
+            e.preventDefault();
+            const prompt = document.getElementById('prompt').value;
+            if (!prompt) return;
+
+            addMessage('user', prompt);
+            document.getElementById('prompt').value = '';
+            showTyping();
+
+            try {
+                const form = new FormData();
+                form.append('prompt', prompt);
+
+                const resp = await fetch('/api/chat', { method: 'POST', body: form });
+                const data = await resp.json();
+                hideTyping();
+                
+                if (data.response) {
+                    addMessage('bot', data.response);
+                } else if (data.error) {
+                    addMessage('bot', 'Error: ' + data.error);
+                }
+            } catch (err) {
+                hideTyping();
+                addMessage('bot', 'Error: ' + err);
+            }
+        };
+
+        // Clear chat
+        document.getElementById('clearChatBtn').onclick = function() {
+            document.getElementById('chatContainer').innerHTML = `
+                <div class="text-center text-gray-500 py-8">
+                    <i class="fas fa-comment-dots text-4xl mb-4"></i>
+                    <p>Start a conversation with your configured model</p>
+                </div>
+            `;
+        };
+
+        // MCP Tools modal
+        const modal = document.getElementById('toolsModal');
+        const viewToolsBtn = document.getElementById('viewToolsBtn');
+        const closeBtn = document.querySelector('.close');
+
+        viewToolsBtn.onclick = function() {
+            modal.style.display = 'block';
+            loadMCPTools();
+        };
+
+        closeBtn.onclick = function() {
+            modal.style.display = 'none';
+        };
+
+        window.onclick = function(event) {
+            if (event.target === modal) {
+                modal.style.display = 'none';
+            }
+        };
+
+        // Initialize
+        window.onload = function() {
+            loadConfig();
+            initializeDarkMode();
+        };
+
+        // Dark mode functionality
+        function initializeDarkMode() {
+            const darkModeToggle = document.getElementById('darkModeToggle');
+            const isDarkMode = localStorage.getItem('darkMode') === 'true';
+            
+            if (isDarkMode) {
+                document.body.classList.add('dark');
+                updateDarkModeIcon(true);
+            }
+            
+            darkModeToggle.onclick = function() {
+                const isDark = document.body.classList.toggle('dark');
+                localStorage.setItem('darkMode', isDark);
+                updateDarkModeIcon(isDark);
+            };
+        }
+
+        function updateDarkModeIcon(isDark) {
+            const darkModeToggle = document.getElementById('darkModeToggle');
+            if (isDark) {
+                darkModeToggle.innerHTML = '<i class="fas fa-sun mr-1"></i>Light Mode';
+                darkModeToggle.className = 'w-full bg-yellow-600 text-white px-2 py-1 rounded-md hover:bg-yellow-700 transition-colors text-sm';
+            } else {
+                darkModeToggle.innerHTML = '<i class="fas fa-moon mr-1"></i>Dark Mode';
+                darkModeToggle.className = 'w-full bg-gray-600 text-white px-2 py-1 rounded-md hover:bg-gray-700 transition-colors text-sm';
+            }
+        }
+    </script>
+</body>
+</html> 
