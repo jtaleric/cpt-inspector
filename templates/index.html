@@ -418,18 +418,36 @@
                 const form = new FormData();
                 form.append('prompt', prompt);
 
-                const resp = await fetch('/api/chat', { method: 'POST', body: form });
+                const controller = new AbortController();
+                const start = Date.now();
+                const timeout = setTimeout(() => controller.abort(), 120000); // 2 minutes
+                const resp = await fetch('/api/chat', { method: 'POST', body: form, signal: controller.signal });
+                clearTimeout(timeout);
+
+                if (!resp.ok) {
+                    // Show HTTP status and error
+                    const text = await resp.text();
+                    hideTyping();
+                    addMessage('bot', `Error: HTTP ${resp.status} ${resp.statusText}\n${text}`);
+                    return;
+                }
+
                 const data = await resp.json();
                 hideTyping();
-                
+
                 if (data.response) {
                     addMessage('bot', data.response);
                 } else if (data.error) {
                     addMessage('bot', 'Error: ' + data.error);
                 }
             } catch (err) {
-                hideTyping();
-                addMessage('bot', 'Error: ' + err);
+                clearTimeout(timeout);
+                const elapsed = ((Date.now() - start) / 1000).toFixed(1);
+                if (err.name === 'AbortError') {
+                    addMessage('bot', `Error: Request timed out after ${elapsed} seconds.`);
+                } else {
+                    addMessage('bot', `Error after ${elapsed} seconds: ${err}`);
+                }
             }
         };
 

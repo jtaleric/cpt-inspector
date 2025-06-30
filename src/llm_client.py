@@ -30,7 +30,7 @@ class OllamaClient(LLMClient):
         """Initialize Ollama client with configuration."""
         self.url = config.get("url", "http://localhost:11434")
         self.model = config.get("model", "llama3.2")
-        self.client = AsyncClient(host=self.url)
+        self.client = AsyncClient(host=self.url,timeout=500)
         # Convert MCP servers list to dictionary for compatibility
         mcp_servers_list = config.get("mcp_servers", [])
         self.mcp_servers = {}

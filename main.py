@@ -109,6 +109,7 @@ async def index(request: Request):
 @app.post("/api/chat")
 async def chat_endpoint(request: Request):
     """Handle chat requests."""
+    import asyncio
     try:
         form_data = await request.form()
         message = form_data.get("prompt", "")
@@ -151,6 +152,9 @@ async def chat_endpoint(request: Request):
             "timestamp": datetime.now().isoformat(),
         }
 
+    except (asyncio.CancelledError, GeneratorExit):
+        logger.warning("Client disconnected before response was sent.")
+        return
     except Exception as e:
         logger.error("Chat endpoint error: %s", e)
         return {"error": str(e)}
@@ -289,4 +293,4 @@ async def get_all_mcp_tools():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000) 
+    uvicorn.run(app, host="0.0.0.0", port=8000, timeout_keep_alive=120) 
